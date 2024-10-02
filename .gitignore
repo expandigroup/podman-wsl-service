@@ -1,0 +1,5 @@
+.idea/
+cmake-build-*/
+out/
+*.exe
+cmd/podman-wsl-service/podman-wsl-service
