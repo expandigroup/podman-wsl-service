@@ -16,6 +16,7 @@ import (
 	"os/signal"
 	"os/user"
 	"path"
+	"podman-wsl-service/pkg/proxy"
 	"podman-wsl-service/pkg/wslpath"
 	"regexp"
 	"strconv"
@@ -164,24 +165,29 @@ func (p *podmanProxy) mangleLibpodVolumes(body map[string]interface{}) error {
 }
 
 func (p *podmanProxy) mangleDockerVolumes(body map[string]interface{}) error {
-	var newBinds []string
+	var newBinds []interface{}
 	hostConfig, ok := body["HostConfig"].(map[string]interface{})
 	if !ok {
-		return errors.New("HostConfig field not found in request body")
+		log.Debugln("HostConfig field not found in request body, assuming no volumes to translate")
+		return nil
 	}
-	binds, ok := hostConfig["Binds"].([]string)
+	binds, ok := hostConfig["Binds"].([]interface{})
 	if !ok {
-		return errors.New("binds field not found in HostConfig")
+		return nil
 	}
 	for _, bind := range binds {
-		parts := strings.Split(bind, ":")
-		hostPath := parts[0]
-		newHostPath, err := p.translateHostPath(hostPath)
-		if err != nil {
-			return err
+		if bind, ok := bind.(string); ok {
+			parts := strings.Split(bind, ":")
+			hostPath := parts[0]
+			newHostPath, err := p.translateHostPath(hostPath)
+			if err != nil {
+				return err
+			}
+			parts[0] = newHostPath
+			newBinds = append(newBinds, strings.Join(parts, ":"))
+		} else {
+			newBinds = append(newBinds, bind)
 		}
-		parts[0] = newHostPath
-		newBinds = append(newBinds, strings.Join(parts, ":"))
 	}
 	hostConfig["Binds"] = newBinds
 	return nil
@@ -257,11 +263,12 @@ func (p *podmanProxy) forwardRequest(dsWriter http.ResponseWriter, r *http.Reque
 	}
 
 	// Close the upstream connection when we're done
-	defer func(dsConn net.Conn) {
-		logger.Traceln("Closing downstream connection")
-		err := dsConn.Close()
+	defer func(usConn net.Conn) {
+		err := usConn.Close()
 		if err != nil {
-			logger.Errorf("Error closing upstream connection: %v\n", err)
+			if !strings.Contains(err.Error(), "use of closed network connection") {
+				logger.Errorf("Error closing downstream connection: %v\n", err)
+			}
 		}
 	}(usConn)
 
@@ -304,36 +311,52 @@ func (p *podmanProxy) forwardRequest(dsWriter http.ResponseWriter, r *http.Reque
 		}
 	} else {
 		// Take over and forward WebSocket communication
-		dsConn, dsReadWriter, err := http.NewResponseController(dsWriter).Hijack()
+		// FIXME: Hijack() doesn't work with Unix sockets
+		// https://github.com/golang/go/issues/69741
+		//dsConn, dsReadWriter, err := http.NewResponseController(dsWriter).Hijack()
+
+		// BEGIN WORKAROUND
+		dsWriter.(http.Flusher).Flush()
+		dsFile, err := getHttpConn(r).File()
 		if err != nil {
-			logger.Errorf("Error hijacking connection: %v\n", err)
+			logger.Errorf("Error getting downstream file descriptor: %v\n", err)
+			http.Error(dsWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		dsFD := int(dsFile.Fd())
+		//newDsFd, err := syscall.Dup(dsFD)
+		//if err != nil {
+		//	logger.Errorf("Error duplicating downstream file descriptor: %v\n", err)
+		//	http.Error(dsWriter, err.Error(), http.StatusInternalServerError)
+		//	return
+		//}
 
-		// Close the downstream connection when we're done
-		defer func(dsConn net.Conn) {
-			err := dsConn.Close()
-			if err != nil {
-				logger.Errorf("Error closing downstream connection: %v\n", err)
-			}
-		}(dsConn)
-
-		// Copy data back and forth between the two connections
-		usToDsDone := make(chan struct{})
-		go func() {
-			flushWriter := &flusherWriter{w: dsConn}
-			if _, err := io.Copy(flushWriter, usConn); err != nil {
-				logger.Errorf("Error copying from upstream to downstream: %v\n", err)
-			}
-			logger.Traceln("Upstream connection closed")
-			close(usToDsDone)
-		}()
-
-		flushWriter := &flusherWriter{w: usConn}
-		if _, err := io.Copy(flushWriter, dsReadWriter); err != nil {
-			logger.Errorf("Error copying from downstream to upstream: %v\n", err)
+		dsConn, err := net.FileConn(os.NewFile(uintptr(dsFD), "downstream-socket"))
+		if err != nil {
+			logger.Panicf("Error creating downstream connection: %v\n", err)
 		}
-		<-usToDsDone
+		//dsReadWriter := bufio.NewReadWriter(bufio.NewReader(dsConn), bufio.NewWriter(dsConn))
+
+		//err = syscall.Close(dsFD)
+		//goland:noinspection GoUnhandledErrorResult
+		go dsWriter.(http.Hijacker).Hijack()
+		// END WORKAROUND
+
+		//if err != nil {
+		//	logger.Errorf("Error hijacking connection: %v\n", err)
+		//	return
+		//}
+
+		if err := proxy.ProxyFileConn(usConn.(*net.UnixConn), dsConn.(*net.UnixConn), logger); err != nil && !errors.Is(err, io.EOF) {
+			logger.Errorf("Error proxying connection: %v\n", err)
+		}
+
+		if err := dsConn.Close(); err != nil {
+			logger.Errorf("Error closing downstream connection: %v\n", err)
+		}
+		if err := usConn.Close(); err != nil {
+			logger.Errorf("Error closing upstream connection: %v\n", err)
+		}
 
 		logger.Infoln("WebSocket connection closed")
 	}
