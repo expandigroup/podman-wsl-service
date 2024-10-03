@@ -14,9 +14,11 @@ import (
 )
 
 var Args struct {
-	LogLevel        string `help:"Set the log level" default:"info"`
-	UpstreamSocket  string `help:"The path to the upstream podman socket" default:"/mnt/wsl/podman-sockets/podman-machine-default/podman-root.sock"`
-	DowstreamSocket string `help:"The path to the downstream podman socket" default:"/run/podman/podman.sock"`
+	LogLevel          string `short:"l" help:"Set the log level" default:"info"`
+	UpstreamSocket    string `short:"u" help:"The path to the upstream podman socket" default:"/mnt/wsl/podman-sockets/podman-machine-default/podman-root.sock"`
+	DownstreamSocket  string `short:"d" help:"The path to the downstream podman socket" default:"/run/podman/podman.sock"`
+	WslDistroName     string `short:"n" help:"The name of the WSL distro (default: autodetect)" default:""`
+	NoMountDistroRoot bool   `short:"M" help:"Do not mount the distro root" default:"false"`
 }
 
 func getWslDistroName() (string, error) {
@@ -28,36 +30,34 @@ func getWslDistroName() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	parts := strings.Split(strings.Trim(winRootPath, "/"), "/")
+	parts := strings.Split(strings.Trim(winRootPath, "/ \r\n\t"), "/")
 	if len(parts) != 2 {
 		return "", errors.New("'wslpath -am /' returned an unexpected value")
 	}
 	return parts[1], nil
 }
 
-func getSharedMountpoint() (string, error) {
-	distroName, err := getWslDistroName()
-	if err != nil {
-		return "", err
-	}
+func getSharedMountpoint(distroName string) string {
+	return "/mnt/wsl/distro-roots/" + distroName
+}
 
-	mountPoint := "/mnt/wsl/distro-roots/" + distroName
-	_, err = os.Stat(mountPoint)
+func mountSharedMountpoint(mountPoint string) error {
+	_, err := os.Stat(mountPoint)
 	if os.IsNotExist(err) {
 		err = os.MkdirAll(mountPoint, 0755)
 	}
 	if err != nil {
-		return "", err
+		return err
 	}
 	mounted, err := mountinfo.Mounted(mountPoint)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	err = mount.MakeShared("/")
 	if err != nil {
 		err = fmt.Errorf("unable to make the root filesystem a shared subtree: %v", err)
-		return "", err
+		return err
 	}
 
 	options := "rbind,rslave"
@@ -68,10 +68,10 @@ func getSharedMountpoint() (string, error) {
 	err = mount.Mount("/", mountPoint, "", options)
 	if err != nil {
 		err = fmt.Errorf("unable to mount the root filesystem to %s: %v", mountPoint, err)
-		return "", err
+		return err
 	}
 
-	return mountPoint, nil
+	return nil
 }
 
 func main() {
@@ -80,12 +80,34 @@ func main() {
 	kong.Parse(&Args)
 	loglib.SetLogLevel(Args.LogLevel)
 
-	sharedRoot, err := getSharedMountpoint()
-	if err != nil {
-		log.Fatalf("Unable to get shared WSL mountpoint: %v\n", err)
+	log.Debugln("Parameters:")
+	log.Debugf("  LogLevel: %s\n", Args.LogLevel)
+	log.Debugf("  UpstreamSocket: %s\n", Args.UpstreamSocket)
+	log.Debugf("  DownstreamSocket: %s\n", Args.DownstreamSocket)
+	log.Debugf("  WslDistroName: %s\n", Args.WslDistroName)
+	log.Debugf("  NoMountDistroRoot: %t\n", Args.NoMountDistroRoot)
+
+	distroName := Args.WslDistroName
+	if distroName == "" {
+		var err error
+		distroName, err = getWslDistroName()
+		if err != nil {
+			log.Fatalf("Unable to get the WSL distro name: %v\n", err)
+		}
+
+		log.Debugf("Detected distro name: %s\n", distroName)
 	}
 
-	proxy := NewPodmanProxy(sharedRoot, Args.UpstreamSocket, Args.DowstreamSocket)
+	mountPoint := getSharedMountpoint(distroName)
+
+	if !Args.NoMountDistroRoot {
+		err := mountSharedMountpoint(mountPoint)
+		if err != nil {
+			log.Fatalf("Unable to get shared WSL mountpoint: %v\n", err)
+		}
+	}
+
+	proxy := NewPodmanProxy(mountPoint, Args.UpstreamSocket, Args.DownstreamSocket)
 	if err := proxy.TestUpstreamSocket(); err != nil {
 		log.Fatalf("Unable to communicate with the upstream socket: %v\n", err)
 	}
