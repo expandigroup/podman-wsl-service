@@ -1,0 +1,21 @@
+{
+  "name": "podman-wsl-service-js",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node --disable-warning=DEP0060 index.js",
+    "watch": "node --disable-warning=DEP0060 --watch index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "pkg": "pkg -o dist/podman-wsl-service -t node22-linux --options \"disable-warning=DEP0060\" -c package.json index.js",
+    "clean": "rm -rf dist"
+  },
+  "private": true,
+  "dependencies": {
+    "commander": "^12.1.0",
+    "systemd-socket": "^0.0.0"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^5.15.0"
+  }
+}
