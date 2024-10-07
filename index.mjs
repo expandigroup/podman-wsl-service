@@ -102,7 +102,7 @@ function mountSharedMountpoint(mountPoint) {
   }
   try {
     // Check if the mount point is already mounted
-    let isMounted = false;
+    let isMounted;
     try {
       execFileSync('mountpoint', ['-q', mountPoint]);
       isMounted = true;
@@ -131,6 +131,7 @@ function translateHostPath(hostPath) {
     const winPath = hostPath.replace('/mnt/', '\\wsl.localhost\\'); // Simplified version
     if (winPath.startsWith('\\wsl.localhost\\')) {
       if (!hostPath.startsWith('/')) {
+        // noinspection ExceptionCaughtLocallyJS
         throw new Error(`PODMAN WSL SERVICE BUG: unexpected path format, expected absolute path: '${hostPath}'`);
       }
       return path.join(sharedRoot, hostPath.slice(1));
