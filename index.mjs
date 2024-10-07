@@ -41,8 +41,10 @@ if (!logLevels.includes(logLevel)) {
   console.error(`Invalid log level: ${logLevel}`);
   process.exit(1);
 }
-console.log = (msg) => (logLevel === 'info' || logLevel === 'debug' ? console.info(msg) : () => {});
-console.debug = (msg) => (logLevel === 'debug' ? console.info(msg) : () => {});
+console.log = (msg) => (logLevel === 'info' || logLevel === 'debug' ? console.info(msg) : () => {
+});
+console.debug = (msg) => (logLevel === 'debug' ? console.info(msg) : () => {
+});
 
 console.debug('Options:');
 console.debug(`- Log level: ${logLevel}`);
@@ -122,6 +124,17 @@ function mountSharedMountpoint(mountPoint) {
   }
 }
 
+function writeError(res, statusCode, message, err) {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+  res.end(
+    JSON.stringify({
+      response: statusCode,
+      message: `podman-wsl-service: ${message}: ${err.message}`,
+      cause: err.message
+    })
+  );
+}
+
 function wslPathToWindowsPath(wslPath) {
   return execFileSync('wslpath', ['-aw', wslPath]).toString().trim();
 }
@@ -179,7 +192,7 @@ async function forwardRequest(req, res, modifiedBody = null) {
     socketPath: upstreamSocketPath,
     method: req.method,
     headers,
-    path: req.url,
+    path: req.url
   };
 
   if (modifiedBody) {
@@ -232,7 +245,9 @@ async function forwardRequest(req, res, modifiedBody = null) {
   upstreamReq.on('error', (err) => {
     console.error(`Error proxying request: ${err.message}`);
     if (!res.headersSent) {
-      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      writeError(res, 500, 'Error proxying request', err);
+    } else {
+      res.end('Internal server error');
     }
   });
 
@@ -295,8 +310,7 @@ const server = http.createServer(async (req, res) => {
         await forwardRequest(req, res, JSON.stringify(jsonBody));
       } catch (err) {
         console.error('Error processing request body:', err);
-        res.writeHead(500, { 'Content-Type': 'text/plain' });
-        res.end('Internal Server Error');
+        writeError(res, 500, 'Error processing request body', err);
       }
     });
   } else {
