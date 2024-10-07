@@ -171,8 +171,7 @@ function patchVolumesLibpod(body) {
     const mount = mounts[i];
     const hostPath = mount.source;
     try {
-      const newHostPath = translateHostPath(hostPath);
-      mounts[i].source = newHostPath;
+      mounts[i].source = translateHostPath(hostPath);
     } catch (err) {
       console.error('Error mangling volumes (libpod):', err);
       throw err;
@@ -190,8 +189,7 @@ function patchVolumesDocker(body) {
     const mount = mounts[i].split(':');
     const hostPath = mount[0];
     try {
-      const newHostPath = translateHostPath(hostPath);
-      mount[0] = newHostPath;
+      mount[0] = translateHostPath(hostPath);
       mounts[i] = mount.join(':');
     } catch (err) {
       console.error('Error mangling volumes (docker):', err);
