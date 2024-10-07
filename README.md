@@ -6,9 +6,8 @@ It will transparently handle bind mounts from the local WSL2 distro into Podman 
 
 Docker API clients such as the Docker CLI and Docker Compose should work with this service.
 
-::: warning
-Podman Kubernetes pods are not supported and bind mounts will not be handled correctly.
-:::
+> [!WARNING]
+> Podman Kubernetes pods are not supported and bind mounts will not be handled correctly.
 
 ## Building an executable
 
