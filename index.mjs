@@ -85,6 +85,7 @@ function getWslDistroName() {
     const result = execFileSync('wslpath', ['-am', '/']).toString().trim();
     const parts = result.split('/').filter(Boolean);
     if (parts.length !== 2) {
+      // noinspection ExceptionCaughtLocallyJS
       throw new Error('Unexpected value from "wslpath -am /"');
     }
     return parts[1];
@@ -329,7 +330,7 @@ const server = http.createServer(async (req, res) => {
       }
     });
   } else {
-    forwardRequest(req, res);
+    await forwardRequest(req, res);
   }
 });
 
