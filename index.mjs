@@ -1,12 +1,11 @@
-const http = require('http');
-const path = require('path');
-const url = require('url');
-const fs = require('fs');
-const net = require('net');
-const os = require('os');
-const systemdSocket = require('systemd-socket');
-const { program } = require('commander');
-const { execFileSync } = require('child_process');
+import fs from 'fs';
+import http from 'http';
+import net from 'net';
+import path from 'path';
+import systemdSocket from 'systemd-socket';
+import url from 'url';
+import { execFileSync } from 'child_process';
+import { program } from 'commander';
 
 const defaultUpstreamSocketPath = '/mnt/wsl/podman-sockets/podman-machine-default/podman-root.sock';
 const defaultDownstreamSocketPath = '/run/podman/podman.sock';
