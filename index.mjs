@@ -122,14 +122,18 @@ function mountSharedMountpoint(mountPoint) {
   }
 }
 
+function wslPathToWindowsPath(wslPath) {
+  return execFileSync('wslpath', ['-aw', wslPath]).toString().trim();
+}
+
 function translateHostPath(hostPath) {
   if (hostPath.startsWith('/mnt/wsl/')) {
     return hostPath;
   }
 
   try {
-    const winPath = hostPath.replace('/mnt/', '\\wsl.localhost\\'); // Simplified version
-    if (winPath.startsWith('\\wsl.localhost\\')) {
+    const winPath = wslPathToWindowsPath(hostPath);
+    if (winPath.startsWith('\\\\wsl.localhost\\')) {
       if (!hostPath.startsWith('/')) {
         // noinspection ExceptionCaughtLocallyJS
         throw new Error(`PODMAN WSL SERVICE BUG: unexpected path format, expected absolute path: '${hostPath}'`);
@@ -230,7 +234,6 @@ async function forwardRequest(req, res, modifiedBody = null) {
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'text/plain' });
     }
-    res.end('Internal Server Error');
   });
 
   if (modifiedBody) {
