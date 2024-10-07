@@ -1,0 +1,13 @@
+[Unit]
+Description=Podman WSL Service
+Requires=podman-wsl-service.socket
+After=network.target
+
+[Service]
+ExecStart=BIN_DIR/podman-wsl-service --log-level debug --shutdown-timeout 30
+Restart=on-failure
+TimeoutStopSec=10
+KillMode=process
+Sockets=podman-wsl-service.socket
+StandardOutput=journal
+StandardError=journal

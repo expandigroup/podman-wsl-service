@@ -1,0 +1,12 @@
+[Unit]
+Description=Podman WSL Service
+PartOf=podman-wsl-service.service
+
+[Socket]
+ListenStream=/run/podman/podman.sock
+SocketMode=0660
+DirectoryMode=0755
+Accept=false
+
+[Install]
+WantedBy=sockets.target
