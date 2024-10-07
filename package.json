@@ -7,7 +7,9 @@
     "start": "node --disable-warning=DEP0060 index.mjs",
     "watch": "node --disable-warning=DEP0060 --watch index.mjs",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "pkg": "pkg -o dist/podman-wsl-service -t node22-linux --options \"disable-warning=DEP0060\" -c package.json index.mjs",
+    "pkg": "npm run pkg-x86_64 && npm run pkg-arm64",
+    "pkg-x86_64": "pkg -o dist/podman-wsl-service-x86_64 -t node22-linux-x64 --options \"disable-warning=DEP0060\" --public -C brotli -c package.json index.mjs",
+    "pkg-arm64": "pkg -o dist/podman-wsl-service-arm64 -t node22-linux-arm64 --options \"disable-warning=DEP0060\" --public -C brotli -c package.json index.mjs",
     "clean": "rm -rf dist"
   },
   "private": true,
