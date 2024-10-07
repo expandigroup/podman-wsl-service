@@ -160,25 +160,40 @@ function translateHostPath(hostPath) {
   }
 }
 
-function patchVolumes(body, type) {
-  const mounts = type === 'libpod' ? body.mounts : body.HostConfig?.Binds;
+function patchVolumesLibpod(body) {
+  const mounts = body.mounts;
   if (!Array.isArray(mounts)) {
     return;
   }
 
   for (let i = 0; i < mounts.length; i++) {
-    const mount = type === 'libpod' ? mounts[i] : mounts[i].split(':');
-    const hostPath = type === 'libpod' ? mount.source : mount[0];
+    const mount = mounts[i];
+    const hostPath = mount.source;
     try {
       const newHostPath = translateHostPath(hostPath);
-      if (type === 'libpod') {
-        mounts[i].source = newHostPath;
-      } else {
-        mount[0] = newHostPath;
-        mounts[i] = mount.join(':');
-      }
+      mounts[i].source = newHostPath;
     } catch (err) {
-      console.error('Error mangling volumes:', err);
+      console.error('Error mangling volumes (libpod):', err);
+      throw err;
+    }
+  }
+}
+
+function patchVolumesDocker(body) {
+  const mounts = body.HostConfig?.Binds;
+  if (!Array.isArray(mounts)) {
+    return;
+  }
+
+  for (let i = 0; i < mounts.length; i++) {
+    const mount = mounts[i].split(':');
+    const hostPath = mount[0];
+    try {
+      const newHostPath = translateHostPath(hostPath);
+      mount[0] = newHostPath;
+      mounts[i] = mount.join(':');
+    } catch (err) {
+      console.error('Error mangling volumes (docker):', err);
       throw err;
     }
   }
@@ -303,9 +318,9 @@ const server = http.createServer(async (req, res) => {
       try {
         const jsonBody = JSON.parse(body);
         if (pathWithoutVersion === '/containers/create') {
-          patchVolumes(jsonBody, 'docker');
+          patchVolumesDocker(jsonBody);
         } else if (pathWithoutVersion === '/libpod/containers/create') {
-          patchVolumes(jsonBody, 'libpod');
+          patchVolumesLibpod(jsonBody);
         }
         await forwardRequest(req, res, JSON.stringify(jsonBody));
       } catch (err) {
