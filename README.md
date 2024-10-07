@@ -1,5 +1,7 @@
 # Podman WSL Service
 
+[![Build](https://github.com/expandigroup/podman-wsl-service/actions/workflows/build_and_release.yml/badge.svg)](https://github.com/expandigroup/podman-wsl-service/actions/workflows/build_and_release.yml) [![Qodana](https://github.com/expandigroup/podman-wsl-service/actions/workflows/qa.yml/badge.svg)](https://github.com/expandigroup/podman-wsl-service/actions/workflows/qa.yml)
+
 This tool is meant to run as a service in WSL2 and expose the Podman API to local WSL2 Docker/Podman clients.
 
 It will transparently handle bind mounts from the local WSL2 distro into Podman containers.
