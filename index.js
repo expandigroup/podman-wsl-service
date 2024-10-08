@@ -1,11 +1,11 @@
-import fs from 'fs';
-import http from 'http';
-import net from 'net';
-import path from 'path';
-import systemdSocket from 'systemd-socket';
-import url from 'url';
-import { execFileSync } from 'child_process';
-import { program } from 'commander';
+const fs = require('fs');
+const http = require('http');
+const net = require('net');
+const path = require('path');
+const systemdSocket = require('systemd-socket');
+const url = require('url');
+const { execFileSync } = require('child_process');
+const { program } = require('commander');
 
 const defaultUpstreamSocketPath = '/mnt/wsl/podman-sockets/podman-machine-default/podman-root.sock';
 const defaultDownstreamSocketPath = '/run/podman/podman.sock';
@@ -150,7 +150,9 @@ function translateHostPath(hostPath) {
         // noinspection ExceptionCaughtLocallyJS
         throw new Error(`PODMAN WSL SERVICE BUG: unexpected path format, expected absolute path: '${hostPath}'`);
       }
-      return path.join(sharedRoot, hostPath.slice(1));
+      const res = path.join(sharedRoot, hostPath.slice(1));
+      console.debug(`Translating host path: ${hostPath} -> ${res}`);
+      return res;
     }
     return winPath;
   } catch (err) {
