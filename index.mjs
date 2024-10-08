@@ -41,10 +41,8 @@ if (!logLevels.includes(logLevel)) {
   console.error(`Invalid log level: ${logLevel}`);
   process.exit(1);
 }
-console.log = (msg) => (logLevel === 'info' || logLevel === 'debug' ? console.info(msg) : () => {
-});
-console.debug = (msg) => (logLevel === 'debug' ? console.info(msg) : () => {
-});
+console.log = (msg) => (logLevel === 'info' || logLevel === 'debug' ? console.info(msg) : () => {});
+console.debug = (msg) => (logLevel === 'debug' ? console.info(msg) : () => {});
 
 console.debug('Options:');
 console.debug(`- Log level: ${logLevel}`);
@@ -131,7 +129,7 @@ function writeError(res, statusCode, message, err) {
     JSON.stringify({
       response: statusCode,
       message: `podman-wsl-service: ${message}: ${err.message}`,
-      cause: err.message
+      cause: err.message,
     })
   );
 }
@@ -206,7 +204,7 @@ async function forwardRequest(req, res, modifiedBody = null) {
     socketPath: upstreamSocketPath,
     method: req.method,
     headers,
-    path: req.url
+    path: req.url,
   };
 
   if (modifiedBody) {
@@ -258,10 +256,20 @@ async function forwardRequest(req, res, modifiedBody = null) {
 
   upstreamReq.on('error', (err) => {
     console.error(`Error proxying request: ${err.message}`);
-    if (!res.headersSent) {
-      writeError(res, 500, 'Error proxying request', err);
+
+    var code, message;
+    if (err.code === 'ENOENT') {
+      code = 502;
+      message = 'Upstream server not found - is Podman running?';
     } else {
-      res.end('Internal server error');
+      code = 500;
+      message = 'Error proxying request';
+    }
+
+    if (!res.headersSent) {
+      writeError(res, code, message, err);
+    } else {
+      res.end(message);
     }
   });
 
