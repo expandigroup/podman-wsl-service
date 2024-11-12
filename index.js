@@ -143,6 +143,11 @@ function translateHostPath(hostPath) {
     return hostPath;
   }
 
+  if (!hostPath.contains('/') && !hostPath.contains('\\')) {
+    // Named volume
+    return hostPath;
+  }
+
   try {
     const winPath = wslPathToWindowsPath(hostPath);
     if (winPath.startsWith('\\\\wsl.localhost\\')) {
