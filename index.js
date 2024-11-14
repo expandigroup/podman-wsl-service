@@ -142,8 +142,8 @@ function translateHostPath(hostPath) {
   if (hostPath.startsWith('/mnt/wsl/')) {
     return hostPath;
   }
-
-  if (!hostPath.contains('/') && !hostPath.contains('\\')) {
+  
+  if (!hostPath.includes('/') && !hostPath.includes('\\')) {
     // Named volume
     return hostPath;
   }
